@@ -20,6 +20,9 @@ straight into a DAW instead of bouncing one track at a time.
 product, it is not supported by Elektron, and it will almost certainly void
 your warranty.** It has been tested on exactly one unit.
 
+**On Windows, no DAW tested can currently open the six-channel stream.** Read
+[Platform support](#platform-support) before you flash anything.
+
 **You must have a MIDI DIN interface before you start.** Recovery from a bad
 flash goes over MIDI DIN only — the startup-menu updater ignores USB MIDI. If
 you do not own a DIN interface, stop here; a failed flash would leave you with
@@ -56,6 +59,47 @@ Worth knowing before you build a mix around them:
   per-track before.
 
 ---
+
+## Platform support
+
+| | status |
+|---|---|
+| **macOS** | ✅ Working — six channels, mapping verified by per-track mute test |
+| **Windows** | ⚠️ **Known problem, see below** |
+| **Linux** | Untested — the build is pure Python and should work, but nobody has confirmed it |
+
+### Windows: DAWs cannot open the six-channel stream
+
+With this firmware installed, on Windows:
+
+- the device enumerates correctly, and Windows reports it as a **6 channel,
+  32 bit, 48000 Hz** input
+- **Windows' own Sound → Recording test works** — it records and plays back
+- but **DAWs fail to open it**. Mixcraft in "Core Audio" (WASAPI) mode gives
+  *"unable to open device"*; Ableton gives *"failed to open interface"*; an
+  ASIO wrapper (FlexASIO) also fails
+- the legacy **"Wave" / MME** mode *does* open it — but MME is stereo-only, so
+  you get **2 of the 6 channels** (tracks 1 and 2), which is not the feature
+
+Reported independently by two people. **Unresolved and under investigation.**
+
+This is not a malformed-descriptor problem. The descriptors have been decoded
+and checked against every constraint Microsoft documents for the in-box
+`usbaudio2.sys` driver, and they pass — the whole descriptor contract differs
+from stock in three bytes, the total length and descriptor count are unchanged,
+and Windows itself parses and reports all six channels. The current theory is
+that the device now offers exactly **one** capture format, 6 ch / 32-bit /
+48 kHz with no stereo fallback, so a host that asks for a stereo input has
+nothing it can be given.
+
+**If you are on Windows:** either wait for a fix, or accept a stereo pair via
+MME for now. Flashing the stock OS back restores normal 2-channel operation at
+any time — see [Recovery](#recovery). Nothing here is permanent.
+
+**If you can help:** please open an issue if you get it working, or if you can
+reproduce it in another DAW. Most useful of all would be your Windows build
+number plus anything `usbaudio2` logs in Event Viewer → Windows Logs → System
+when the DAW fails to open the device.
 
 ## Requirements
 
