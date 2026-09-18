@@ -1,0 +1,18 @@
+# NEVER commit firmware images -- original or modified. This project ships
+# patches, not Elektron's code.
+*.syx
+*.zip
+
+# Build products and the cloned third-party packer
+build/
+vendor/
+out/
+
+# Captures from the USB stream
+captures/
+*.wav
+
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
