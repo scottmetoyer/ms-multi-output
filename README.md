@@ -20,8 +20,9 @@ straight into a DAW instead of bouncing one track at a time.
 product, it is not supported by Elektron, and it will almost certainly void
 your warranty.** It has been tested on exactly one unit.
 
-**On Windows, no DAW tested can currently open the six-channel stream.** Read
-[Platform support](#platform-support) before you flash anything.
+**On Windows you need FlexASIO with the DirectSound backend** — a DAW's normal
+WASAPI or ASIO settings will not open the device. See
+[Platform support](#platform-support).
 
 **You must have a MIDI DIN interface before you start.** Recovery from a bad
 flash goes over MIDI DIN only — the startup-menu updater ignores USB MIDI. If
@@ -65,41 +66,44 @@ Worth knowing before you build a mix around them:
 | | status |
 |---|---|
 | **macOS** | ✅ Working — six channels, mapping verified by per-track mute test |
-| **Windows** | ⚠️ **Known problem, see below** |
+| **Windows** | ✅ Working — but needs FlexASIO set to DirectSound, see below |
 | **Linux** | Untested — the build is pure Python and should work, but nobody has confirmed it |
 
-### Windows: DAWs cannot open the six-channel stream
+### Windows: use FlexASIO with the DirectSound backend
 
-With this firmware installed, on Windows:
+All six channels work on Windows — but **not** through a DAW's normal WASAPI or
+ASIO settings. Use FlexASIO, configured to use DirectSound:
 
-- the device enumerates correctly, and Windows reports it as a **6 channel,
-  32 bit, 48000 Hz** input
-- **Windows' own Sound → Recording test works** — it records and plays back
-- but **DAWs fail to open it**. Mixcraft in "Core Audio" (WASAPI) mode gives
-  *"unable to open device"*; Ableton gives *"failed to open interface"*; an
-  ASIO wrapper (FlexASIO) also fails
-- the legacy **"Wave" / MME** mode *does* open it — but MME is stereo-only, so
-  you get **2 of the 6 channels** (tracks 1 and 2), which is not the feature
+1. Install [FlexASIO](https://github.com/dechamps/FlexASIO).
+2. Set its backend to **DirectSound** — via FlexASIO Control (the GUI), or the
+   `backend` setting in `FlexASIO.toml`.
+3. In your DAW, select **FlexASIO** as the ASIO device.
 
-Reported independently by two people. **Unresolved and under investigation.**
+Confirmed in Reaper with all six channels arriving.
 
-This is not a malformed-descriptor problem. The descriptors have been decoded
-and checked against every constraint Microsoft documents for the in-box
-`usbaudio2.sys` driver, and they pass — the whole descriptor contract differs
-from stock in three bytes, the total length and descriptor count are unchanged,
-and Windows itself parses and reports all six channels. The current theory is
-that the device now offers exactly **one** capture format, 6 ch / 32-bit /
-48 kHz with no stereo fallback, so a host that asks for a stereo input has
-nothing it can be given.
+**What does not work**, so you don't waste time on it:
 
-**If you are on Windows:** either wait for a fix, or accept a stereo pair via
-MME for now. Flashing the stock OS back restores normal 2-channel operation at
-any time — see [Recovery](#recovery). Nothing here is permanent.
+| path | result |
+|---|---|
+| WASAPI — Mixcraft "Core Audio" | *"unable to open device"* |
+| WASAPI — Reaper | *"could not find input device format"* |
+| FlexASIO on other backends (KS, WASAPI) | fails |
+| MME / "Wave" | opens, but MME is stereo-only — 2 of the 6 channels |
+| Ableton, default settings | *"failed to open interface"* |
 
-**If you can help:** please open an issue if you get it working, or if you can
-reproduce it in another DAW. Most useful of all would be your Windows build
-number plus anything `usbaudio2` logs in Event Viewer → Windows Logs → System
-when the DAW fails to open the device.
+**This is not a descriptor fault.** Windows enumerates the device correctly,
+its own Sound → Recording test works, and it reports the device as 6 channel /
+32 bit / 48000 Hz. The descriptors have been decoded and checked against every
+constraint Microsoft documents for the in-box `usbaudio2.sys` driver, and they
+pass. The device offers exactly **one** capture format with no stereo fallback,
+which appears to be why hosts demanding an exact format refuse it while
+shared-mode paths — Windows' own test, MME, and DirectSound — are happy.
+
+Note the device is **48 kHz only**. If your DAW is set to 44.1 kHz, that alone
+will fail, on stock firmware as much as on this one.
+
+If you find a cleaner route, please open an issue — especially one that works
+without FlexASIO.
 
 ## Requirements
 
