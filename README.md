@@ -61,8 +61,10 @@ Worth knowing before you build a mix around them:
 
 - Model:Samples running **OS 1.13** (the version this is built against)
 - A **MIDI DIN interface** wired to the Model:Samples' MIDI IN — required
-- Python 3.9+, plus `mido` and `python-rtmidi` for flashing
+- Python 3.9+ — `build.py` needs only the standard library
+- `mido` and `python-rtmidi`, for flashing (installed into a venv below)
 - A C compiler, to build the packer in `setup.sh`
+- `numpy`, only if you want the optional stream check in [Verify](#verify)
 
 No m68k toolchain is needed. The patch ships as a listed byte table.
 
@@ -71,9 +73,17 @@ No m68k toolchain is needed. The patch ships as a listed byte table.
 ```sh
 git clone https://github.com/scottmetoyer/ms-multi-output.git
 cd ms-multi-output
-./setup.sh                      # builds the .syx packer
-pip install mido python-rtmidi  # for flashing
+./setup.sh                                # builds the .syx packer
+
+python3 -m venv .venv                     # keeps deps off your system Python
+.venv/bin/pip install mido python-rtmidi  # for flashing
+.venv/bin/pip install numpy               # optional, for the stream check
 ```
+
+**Use the venv rather than bare `pip`.** A stray `pip` earlier in `PATH` than
+your real one will install into — or crash on — the wrong interpreter, and the
+error it produces does not look like a Python problem at all. See
+[Troubleshooting](#troubleshooting).
 
 **Get the official OS yourself.** No Elektron firmware is distributed here, so
 download `model-samples_OS1.13.zip` from elektron.se and unzip it.
@@ -104,7 +114,7 @@ Put the device into OS upgrade mode:
 Dry run first — it will list your MIDI ports and check the image:
 
 ```sh
-python3 tools/flash.py ms-multi-output.syx
+.venv/bin/python tools/flash.py ms-multi-output.syx
 ```
 
 Then send it, naming your DIN output. **Pacing matters:** at exactly wire speed
@@ -112,7 +122,7 @@ a packet eventually drops and the device sits on `RECEIVING...` forever (which
 looks alarming but harms nothing — power-cycle and retry).
 
 ```sh
-python3 tools/flash.py ms-multi-output.syx --port "YOUR DIN PORT" --pace 1.4 --send
+.venv/bin/python tools/flash.py ms-multi-output.syx --port "YOUR DIN PORT" --pace 1.4 --send
 ```
 
 Roughly 6–7 minutes. Do not power off, especially once the screen says
@@ -133,7 +143,7 @@ channels. Solo one track and confirm it appears on the matching channel.
 Optionally check the stream is clean — play something and capture, then:
 
 ```sh
-python3 tools/analyse_dupes.py your-capture.wav
+.venv/bin/python tools/analyse_dupes.py your-capture.wav
 ```
 
 Every active channel should read `CLEAN`. Muted tracks read `CONSTANT/DC`,
@@ -147,7 +157,7 @@ If the device will not boot, is stuck, or you simply want stock back:
 2. Send the **official** `model-samples_OS1.13.syx` over MIDI DIN:
 
 ```sh
-python3 tools/flash.py model-samples_OS1.13.syx --port "YOUR DIN PORT" --pace 1.4 --send
+.venv/bin/python tools/flash.py model-samples_OS1.13.syx --port "YOUR DIN PORT" --pace 1.4 --send
 ```
 
 This works even when the main OS is unbootable, because the bootloader is in a
@@ -180,6 +190,49 @@ so the ring must span more than that or the controller re-sends stale slots —
 audible as a bell-like ringing on transients. This build uses depth 8 (48
 frames, 1.0 ms). An earlier build used depth 4 (24 frames) and repeated ~25% of
 all frames. If you fork this, do not shrink it.
+
+## Troubleshooting
+
+### `pip install` aborts with `Library not loaded: libintl.8.dylib`
+
+```
+dyld: Library not loaded: /usr/local/opt/gettext/lib/libintl.8.dylib
+  Referenced from: .../.pyenv/versions/3.9.6/bin/python3.9
+zsh: abort      pip install python-rtmidi
+```
+
+**This is a broken Python, not a broken package.** The interpreter itself
+cannot start, so `pip` dies before installing anything — `python-rtmidi` is
+just the innocent bystander named on the command line. It usually means a pyenv
+build linked against a Homebrew prefix that no longer exists: `/usr/local` is
+the *Intel* prefix, and on Apple Silicon Homebrew lives at `/opt/homebrew`.
+
+The catch is that `python3` can be perfectly healthy while every `pip` is dead,
+because a stale `pip` in `~/.local/bin` shadows the real one. Check what you
+are actually running:
+
+```sh
+which pip                 # is it ~/.local/bin/pip rather than your pyenv/venv?
+head -1 "$(which pip)"    # the shebang names the interpreter it will use
+python3 -m pip --version  # bypasses stray pip scripts entirely
+```
+
+Version-specific names are not safe either — a `pip3.11` can carry a shebang
+pointing at a dead 3.9.
+
+Fixes, in order of preference:
+
+1. **Use the venv** from [Install](#install). `python3 -m venv .venv` builds on
+   whatever `python3` resolves to and generates a fresh `.venv/bin/pip`, so
+   nothing in `PATH` can interfere.
+2. `python3 -m pip install ...` instead of bare `pip`.
+3. Delete the stale scripts in `~/.local/bin` (check each shebang first — that
+   directory usually holds unrelated tools you want to keep).
+
+### The device sits on `RECEIVING...` forever
+
+A packet was dropped mid-transfer. Harmless — power-cycle, re-enter OS upgrade
+mode, and send again. If it recurs, raise `--pace` above 1.4.
 
 ## Credits
 
