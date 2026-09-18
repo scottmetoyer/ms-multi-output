@@ -193,41 +193,42 @@ all frames. If you fork this, do not shrink it.
 
 ## Troubleshooting
 
-### `pip install` aborts with `Library not loaded: libintl.8.dylib`
+### `pip` crashes before it installs anything
 
-```
-dyld: Library not loaded: /usr/local/opt/gettext/lib/libintl.8.dylib
-  Referenced from: .../.pyenv/versions/3.9.6/bin/python3.9
-zsh: abort      pip install python-rtmidi
-```
+If `pip` fails with a *dynamic linker* error rather than a package error — on
+macOS something like `dyld: Library not loaded: ...`, on Linux
+`error while loading shared libraries: ...` — then **the interpreter is broken,
+not the package.** Python cannot start, so `pip` dies before doing any work,
+and whichever package you named on the command line takes the blame for it.
 
-**This is a broken Python, not a broken package.** The interpreter itself
-cannot start, so `pip` dies before installing anything — `python-rtmidi` is
-just the innocent bystander named on the command line. It usually means a pyenv
-build linked against a Homebrew prefix that no longer exists: `/usr/local` is
-the *Intel* prefix, and on Apple Silicon Homebrew lives at `/opt/homebrew`.
+Two common causes:
 
-The catch is that `python3` can be perfectly healthy while every `pip` is dead,
-because a stale `pip` in `~/.local/bin` shadows the real one. Check what you
-are actually running:
+- A Python built against a library path that has since moved or been removed.
+  A version-manager build (pyenv, asdf, conda) that predates an OS, package
+  manager or CPU-architecture change is the usual culprit.
+- A stale `pip` script sitting earlier in `PATH` than your real one and
+  pointing at that dead interpreter. `python3` can be perfectly healthy while
+  every `pip` on your `PATH` is not, which makes this confusing to spot.
+
+Work out which you have:
 
 ```sh
-which pip                 # is it ~/.local/bin/pip rather than your pyenv/venv?
-head -1 "$(which pip)"    # the shebang names the interpreter it will use
+which pip                 # which pip are you actually getting?
+head -1 "$(which pip)"    # its shebang names the interpreter it will use
 python3 -m pip --version  # bypasses stray pip scripts entirely
 ```
 
-Version-specific names are not safe either — a `pip3.11` can carry a shebang
-pointing at a dead 3.9.
+Version-specific names are not automatically safe — a `pip3.N` can carry a
+shebang pointing at a different, dead Python.
 
-Fixes, in order of preference:
+Fixes, best first:
 
 1. **Use the venv** from [Install](#install). `python3 -m venv .venv` builds on
-   whatever `python3` resolves to and generates a fresh `.venv/bin/pip`, so
-   nothing in `PATH` can interfere.
+   whatever `python3` resolves to and generates its own `pip` inside the venv,
+   so nothing on `PATH` can interfere. This is why the install steps use one.
 2. `python3 -m pip install ...` instead of bare `pip`.
-3. Delete the stale scripts in `~/.local/bin` (check each shebang first — that
-   directory usually holds unrelated tools you want to keep).
+3. Remove or repair the stale script — check its shebang first, since the
+   directory it lives in usually holds unrelated tools worth keeping.
 
 ### The device sits on `RECEIVING...` forever
 
