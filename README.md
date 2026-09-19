@@ -16,7 +16,7 @@ into a DAW instead of bouncing one track at a time.
 | target | status |
 |---|---|
 | **Model:Samples** | ✅ Working — verified on hardware, channel map confirmed by per-track mute test |
-| **Model:Cycles** | ✅ Working — verified on hardware (see [Model:Cycles](#modelcycles) — it installs differently) |
+| **Model:Cycles** | ✅ Working — verified on hardware, channel map confirmed by per-track mute test (see [Model:Cycles](#modelcycles) — it installs differently) |
 
 ⚠️ **The Model:Cycles build has only been tested by cross-flashing a
 Model:Samples**, which is how it was developed. It has **never been run on
@@ -258,8 +258,9 @@ sector OS updates never touch. It does **not** work over USB MIDI.
 
 ## Model:Cycles
 
-**Verified working on hardware.** Six independent per-track channels, with zero
-ring duplicates — the same result as the Model:Samples build.
+**Verified working on hardware.** Six independent per-track channels with zero
+ring duplicates, and the channel map confirmed by per-track mute test — the
+same result as the Model:Samples build.
 
 ⚠️ **It was developed and tested by cross-flashing a Model:Samples, and has
 never been run on real Model:Cycles hardware.** Everything below describes
@@ -314,11 +315,6 @@ unknown.
 ⚠️ The box runs Cycles OS on top of Model:Samples project data. How it handles
 saving and loading is unexplored — **back up your +Drive with Elektron Transfer
 before you start.**
-
-⚠️ The per-track mute test has not been run on the Cycles. Six independent
-channels arrive at sensible levels, but that does not strictly prove channel
-*n* is track *n* rather than some permutation. Check it before trusting the map
-for real work — and please open an issue with what you find.
 
 ## How it works
 
