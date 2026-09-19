@@ -13,15 +13,45 @@ into a DAW instead of bouncing one track at a time.
 
 48 kHz, 32-bit, High Speed. The device still reports itself as OS `1.13`.
 
-| target | status |
-|---|---|
-| **Model:Samples** | ✅ Working — verified on hardware, channel map confirmed by per-track mute test |
-| **Model:Cycles** | ✅ Working — verified on hardware, channel map confirmed by per-track mute test (see [Model:Cycles](#modelcycles) — it installs differently) |
+## Which build do I want?
 
-⚠️ **The Model:Cycles build has only been tested by cross-flashing a
-Model:Samples**, which is how it was developed. It has **never been run on
-actual Model:Cycles hardware**. See [Model:Cycles](#modelcycles) before you try
-it on a real one.
+| you own | you want | build |
+|---|---|---|
+| **Model:Samples** | six channels on it | `--target samples` |
+| **Model:Cycles** | six channels on it | `--target cycles` |
+| **Model:Samples** | to turn it into a six-channel **Cycles** | `--target cycles-crossflash` |
+
+```sh
+python3 build.py --target samples --syx model-samples_OS1.13.syx
+python3 build.py --target cycles  --syx model-cycles_OS1.13.syx
+```
+
+### How well tested is each?
+
+| build | status |
+|---|---|
+| `samples` | ✅ **Verified on hardware.** Channel map confirmed by per-track mute test. |
+| `cycles-crossflash` | ✅ **Verified on hardware.** Same, on a Model:Samples running Cycles OS. |
+| `cycles` | ⚠️ **The code is verified; this packaging is not.** |
+
+⚠️ **`--target cycles` has never been flashed to an actual Model:Cycles**,
+because no Model:Cycles was available during development. Be aware of what is
+and is not proven:
+
+- **The patched code is hardware-verified.** It is *byte-identical* to the
+  `cycles-crossflash` build, which was tested on a Model:Samples running Cycles
+  OS — six independent channels, zero ring duplicates, channel map confirmed by
+  mute test. The two builds differ **only** in which `.syx` container the same
+  patched MAIN OS is packed into.
+- **What is untried** is that container pairing on real Cycles hardware. It is
+  the natural one — a `0x11` container to a `0x11` device, exactly how
+  Elektron's own updates are packed — so there is good reason to expect it to
+  work, but nobody has done it.
+
+If you flash it to a real Model:Cycles, **please open an issue** either way.
+That is the one result this project cannot produce for itself. Have a MIDI DIN
+interface and the official `model-cycles_OS1.13.syx` to hand first — see
+[Recovery](#recovery).
 
 ---
 
@@ -29,9 +59,9 @@ it on a real one.
 
 **This flashes modified firmware to your instrument. It is not an Elektron
 product, it is not supported by Elektron, and it will almost certainly void
-your warranty.** It has been tested on exactly one unit — a Model:Samples,
-including for the Model:Cycles build, which was developed by cross-flashing
-that same box and has **never run on real Model:Cycles hardware**.
+your warranty.** It has been tested on exactly one unit — a Model:Samples. The
+Model:Cycles code was developed by cross-flashing that same box, so **no real
+Model:Cycles has ever run this**. See [Which build do I want?](#which-build-do-i-want).
 
 **On Windows you need FlexASIO, at 48 kHz** — a DAW's normal WASAPI or ASIO
 settings will not open the device. MME, DirectSound and WASAPI-shared all work;
@@ -132,9 +162,11 @@ they pass.
 
 ## Requirements
 
-- A **Model:Samples** running **OS 1.13** (the version this is built against).
-  The Model:Cycles build is installed onto a Model:Samples too — see
-  [Model:Cycles](#modelcycles)
+- A **Model:Samples** or **Model:Cycles** running **OS 1.13** (the version this
+  is built against)
+- The official OS `.syx` for **the instrument you are flashing**. The
+  `cycles-crossflash` build needs **both** — see
+  [Which build do I want?](#which-build-do-i-want)
 - A **MIDI DIN interface** wired to the Model:Samples' MIDI IN — required
 - Python 3.9+ — `build.py` needs only the standard library
 - `mido` and `python-rtmidi`, for flashing (installed into a venv below)
@@ -164,14 +196,22 @@ error it produces does not look like a Python problem at all. See
 download the OS `.zip` from elektron.se and unzip it.
 
 ```sh
-# Model:Samples
-python3 build.py --syx model-samples_OS1.13.syx
+# you own a Model:Samples, you want six channels on it
+python3 build.py --target samples --syx model-samples_OS1.13.syx
 
-# Model:Cycles -- needs BOTH images, see the Model:Cycles section for why
-python3 build.py --target cycles \
+# you own a Model:Cycles, you want six channels on it
+python3 build.py --target cycles --syx model-cycles_OS1.13.syx
+
+# you own a Model:Samples and want to turn it into a six-channel Cycles
+python3 build.py --target cycles-crossflash \
     --syx model-cycles_OS1.13.syx \
     --container model-samples_OS1.13.syx
 ```
+
+Each target writes its own file: `ms-multi-output.syx`, `mc-multi-output.syx`
+or `mc-on-ms-multi-output.syx`. **Flash the one whose target matches the box in
+front of you** — the wrong one is silently ignored by the bootloader rather
+than rejected with an error.
 
 The build refuses unless your inputs are the exact OS 1.13 images, checks the
 expected stock bytes at every patch site (41 for Samples, 29 for Cycles), and
@@ -258,63 +298,74 @@ sector OS updates never touch. It does **not** work over USB MIDI.
 
 ## Model:Cycles
 
-**Verified working on hardware.** Six independent per-track channels with zero
-ring duplicates, and the channel map confirmed by per-track mute test — the
-same result as the Model:Samples build.
+There are two ways to end up with a six-channel Cycles, and they are **not**
+interchangeable — the bootloader will silently ignore the wrong one.
 
-⚠️ **It was developed and tested by cross-flashing a Model:Samples, and has
-never been run on real Model:Cycles hardware.** Everything below describes
-putting Cycles firmware onto a **Model:Samples**. If you own an actual
-Model:Cycles, this build is untested on it and the install described here does
-not apply to you — please do not assume it is symmetric.
+### You own a Model:Cycles → `--target cycles`
 
-### You cannot just flash a Cycles .syx
+```sh
+python3 build.py --target cycles --syx model-cycles_OS1.13.syx
+```
 
-The Model:Samples bootloader checks the **device id in the `.syx` container**
-(`0x0f` Samples, `0x11` Cycles) and **silently ignores a foreign image**. There
-is no error. The screen sits on `READY TO RECEIVE` while the entire 890 kB goes
-past at the correct rate and your flashing tool reports a clean 100%. It is
-indistinguishable from a dead MIDI cable, and it is the single most confusing
-failure in this whole project.
+One input, packed back into its own Cycles container. Flash
+`mc-multi-output.syx` to the Model:Cycles exactly as you would an official
+update.
+
+⚠️ **Untested on real Model:Cycles hardware** — see
+[Which build do I want?](#which-build-do-i-want) for exactly what that means.
+The code is verified; the packaging is not.
+
+Recovery is the ordinary one: send the official `model-cycles_OS1.13.syx` over
+MIDI DIN.
+
+### You own a Model:Samples → `--target cycles-crossflash`
+
+This turns a Model:Samples into a six-channel Model:Cycles. It is how the
+Cycles support was developed and tested.
+
+```sh
+python3 build.py --target cycles-crossflash \
+    --syx model-cycles_OS1.13.syx \
+    --container model-samples_OS1.13.syx
+```
+
+**You cannot just flash a Cycles `.syx` to a Model:Samples.** The bootloader
+checks the **device id in the `.syx` container** (`0x0f` Samples, `0x11`
+Cycles) and **silently ignores a foreign image**. There is no error: the screen
+sits on `READY TO RECEIVE` while the entire 890 kB goes past at the correct
+rate and your flashing tool reports a clean 100%. It is indistinguishable from
+a dead MIDI cable.
 
 **The fix** — [originally found by a user on
 r/Elektron](https://www.reddit.com/r/Elektron/comments/1w87ta6/flashing_modelcycles_firmware_into_a_modelsamples/p80jsvo/)
 — is to keep the **Samples** container and replace only its `section_3` (MAIN
-OS) with the Cycles one. `build.py --target cycles` does exactly that, which is
-why it needs both `.syx` files:
+OS) with the Cycles one. That is why this target needs two files:
 
 | argument | supplies |
 |---|---|
 | `--syx model-cycles_OS1.13.syx` | the **code** (Cycles MAIN OS, patched) |
 | `--container model-samples_OS1.13.syx` | the **wrapper** the bootloader accepts |
 
-The output is a Samples-container image carrying Cycles code. Flash it exactly
-like the Samples build.
+**Recovery is unaffected.** The post above warns that once cross-flashed the
+box "thinks it's a Cycles" and needs a Cycles container to go back. **That was
+tested here and is not the case.** Afterwards a `0x11` container is still
+ignored and a `0x0f` one still accepted, because only MAIN OS is replaced and
+the Samples bootstrap — with its bootloader — is untouched. Plain
+`model-samples_OS1.13.syx` remains your rescue image.
 
-### Recovery is unaffected
+⚠️ The box then runs Cycles OS on top of Model:Samples project data. How it
+handles saving and loading is unexplored — **back up your +Drive with Elektron
+Transfer first.**
 
-The post above warns that once cross-flashed the box "thinks it's a Cycles" and
-needs a Cycles container to go back. **That was tested here and is not the case
-for this build.** After cross-flashing, a `0x11` container was still ignored
-and a `0x0f` one still accepted — because only MAIN OS is replaced, so the
-Samples bootstrap and its bootloader are untouched.
-
-**Plain `model-samples_OS1.13.syx` remains your rescue image**, exactly as in
-[Recovery](#recovery). Nothing special is needed.
-
-### What you get
+### What you get, either way
 
 The box boots as a Model:Cycles — Cycles machines, Cycles UI — with six
-per-track USB channels. It identifies over USB as `Elektron Model:Cycles`.
+per-track USB channels, and identifies over USB as `Elektron Model:Cycles`.
 
 Everything in [What the stems actually are](#what-the-stems-actually-are)
 applies, with one difference: **track LEVEL is confirmed pre-tap on the
 Model:Samples but untested on the Cycles**, so whether the stems carry it is
 unknown.
-
-⚠️ The box runs Cycles OS on top of Model:Samples project data. How it handles
-saving and loading is unexplored — **back up your +Drive with Elektron Transfer
-before you start.**
 
 ## How it works
 
@@ -391,9 +442,9 @@ Fixes, best first:
 
 The image is being **silently rejected** on its container device id, and
 nothing is being written — even though the transfer runs to 100% normally.
-You are almost certainly flashing a Model:Cycles `.syx` to a Model:Samples;
-build it with `--target cycles --container model-samples_OS1.13.syx` instead,
-and see [Model:Cycles](#modelcycles).
+You built for the wrong target. Flashing a Model:Cycles image to a
+Model:Samples needs `--target cycles-crossflash`; flashing to an actual
+Model:Cycles needs `--target cycles`. See [Model:Cycles](#modelcycles).
 
 To confirm the MIDI path itself is fine, send the official
 `model-samples_OS1.13.syx`: if *that* moves to `RECEIVING...` on the same cable
